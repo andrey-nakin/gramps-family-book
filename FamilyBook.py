@@ -82,6 +82,7 @@ class FamilyBook(Report):
         self.doc.write_text('\\usepackage{graphicx}\n')
         self.doc.write_text('\\usepackage{wrapfig}\n')
         self.doc.write_text('\\usepackage{multicol}\n')
+        self.doc.write_text('\\usepackage{tgadventor}\n')
         self.doc.write_text('\\begin{document}\n')
         self.doc.write_text('\\tableofcontents\n')
         self.doc.write_text('\\part{Персоналии}\n')
