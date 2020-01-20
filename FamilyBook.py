@@ -30,6 +30,7 @@
 #
 #------------------------------------------------------------------------
 import string
+from collections import defaultdict
 
 #------------------------------------------------------------------------
 #
@@ -38,7 +39,7 @@ import string
 #------------------------------------------------------------------------
 from gramps.gen.display.name import displayer
 from gramps.gen.display.place import displayer as place_displayer
-from gramps.gen.lib import Date, Event, EventType, FamilyRelType, Name, NameType
+from gramps.gen.lib import Date, Event, EventType, FamilyRelType, Name, NameType, Person, Family, Place
 from gramps.gen.lib import StyledText, StyledTextTag, StyledTextTagType
 from gramps.gen.plug import docgen
 from gramps.gen.plug.menu import BooleanOption, EnumeratedListOption, PersonOption
@@ -109,6 +110,7 @@ class FamilyBook(Report):
         """
 
         Report.__init__(self, database, options, user)
+        self.user = user
         menu = options.menu
         self.person_id    = menu.get_option_by_name('pid').get_value()
         self.recurse      = FamilyBookOptions.RECURSE_NONE
@@ -140,16 +142,102 @@ class FamilyBook(Report):
         self.doc.write_text('\\part{Персоналии}\n')
         self.doc.end_paragraph()
 
-        person = self.database.get_person_from_gramps_id(self.person_id)
-        (rank, ahnentafel, person_key) = self.__calc_person_key(person)
-        self.__process_person(person, rank, ahnentafel, person_key)
+        self._build_obj_dict()
+
+#        person = self.database.get_person_from_gramps_id(self.person_id)
+#        (rank, ahnentafel, person_key) = self.__calc_person_key(person)
+#        self.__process_person(person)
+
+        person_list = list(self.obj_dict[Person].keys())
+#        person_list.sort(key = lambda x: self.obj_dict[Person][x][OBJDICT_INDEX])
+        for person_handle in person_list:
+            person = self.database.get_person_from_handle(person_handle)
+            self.__process_person(person)
 
         self.doc.start_paragraph('FSR-Normal')
         self.doc.write_text('\\end{document}\n')
         self.doc.end_paragraph()
 
+    def _build_obj_dict(self):
+        _obj_class_list = (Person, Place)
 
-    def __format_name(self, person):
+        # setup a dictionary of the required structure
+        self.obj_dict = defaultdict(lambda: defaultdict(set))
+        self.bkref_dict = defaultdict(lambda: defaultdict(set))
+
+
+        # initialise the dictionary to empty in case no objects of any
+        # particular class are included in the web report
+        for obj_class in _obj_class_list:
+            self.obj_dict[obj_class] = defaultdict(set)
+
+        ind_list = self.database.iter_person_handles()
+#        ind_list = self.filter.apply(self.database, ind_list, user=self.user)
+
+        for handle in ind_list:
+            self._add_person(handle)
+
+        # Debug output
+#        log.debug("final object dictionary \n" +
+#                  "".join(("%s: %s\n" % item) for item in self.obj_dict.items()))
+
+#        log.debug("final backref dictionary \n" +
+#                  "".join(("%s: %s\n" % item) for item in self.bkref_dict.items()))
+
+    def _add_person(self, person_handle, bkref_class = None, bkref_handle = None):
+        '''
+        Add person_handle to the L{self.obj_dict}, and recursively all referenced objects
+        '''
+        # Update the dictionaries of objects back references
+        if (bkref_class is not None):
+            self.bkref_dict[Person][person_handle].add((bkref_class, bkref_handle, None))
+        # Check if the person is already added
+        if (person_handle in self.obj_dict[Person]): return
+        # Add person in the dictionaries of objects
+        person = self.database.get_person_from_handle(person_handle)
+        if (not person): return
+        person_name = self.__person_name(person)
+        self.obj_dict[Person][person_handle] = [person_name, person.gramps_id, len(self.obj_dict[Person])]
+        # Person events
+#        evt_ref_list = person.get_event_ref_list()
+#        if evt_ref_list:
+#            for evt_ref in evt_ref_list:
+#                self._add_event(evt_ref.ref, Person, person_handle, evt_ref)
+        # Person citations
+#        for citation_handle in person.get_citation_list():
+#            self._add_citation(citation_handle, Person, person_handle)
+        # Person name citations
+#        for name in [person.get_primary_name()] + \
+#                        person.get_alternate_names():
+#            for citation_handle in name.get_citation_list():
+#                self._add_citation(citation_handle, Person, person_handle)
+        # LDS Ordinance citations
+#        for lds_ord in person.get_lds_ord_list():
+#            for citation_handle in lds_ord.get_citation_list():
+#                self._add_citation(citation_handle, Person, person_handle)
+        # Attribute citations
+#        for attr in person.get_attribute_list():
+#            for citation_handle in attr.get_citation_list():
+#                self._add_citation(citation_handle, Person, person_handle)
+        # Person families
+#        family_handle_list = person.get_family_handle_list()
+#        if family_handle_list:
+#            for family_handle in person.get_family_handle_list():
+#                self._add_family(family_handle, Person, person_handle)
+        # Person media
+#        for media_ref in person.get_media_list():
+#            media_handle = media_ref.get_reference_handle()
+#            self._add_media(media_handle, Person, person_handle, media_ref)
+        # Association citations
+#        for assoc in person.get_person_ref_list():
+#            for citation_handle in assoc.get_citation_list():
+#                self._add_citation(citation_handle, Person, person_handle)
+        # Addresses citations
+#        for addr in person.get_address_list():
+#            for citation_handle in addr.get_citation_list():
+#                self._add_citation(citation_handle, Person, person_handle)
+
+    def __person_name(self, person):
         """
         Construct person name.
 
@@ -163,187 +251,22 @@ class FamilyBook(Report):
 
         return displayer.display_name(person.get_primary_name()) + maindenName
 
-    def __process_person(self, person, rank, ahnentafel, person_key):
-        """
-        Recursively build the Family Book for this person and all children
-        with spouses.
-
-        @param person: Person object for the key person of the Family Book.
-        @param rank: Numerical distance between the central person in the
-            database and the person in the parameter (the number of births
-            needed to connect them).
-        @param ahnentafel: "Ahnentafel" number of the common ancestor of the
-            central person in the database and the person in the parameter,
-            seen from the side of the central person in the database.
-        @param person_key: Family Book key to be printed on the top right of
-            the corner.
-        """
-
+    def __process_person(self, person):
         #!!!
         self.doc.start_paragraph('FSR-Normal')
         self.doc.write_text('\\chapter{')
-        self.doc.write_text(self.__format_name(person))
-        self.doc.write_text('}')
+        self.doc.write_text(self.__person_name(person))
+        self.doc.write_text('}\n')
+        self.doc.write_text('\\label{')
+        self.doc.write_text(person.get_gramps_id())
+        self.doc.write_text('}\n')
+        self.doc.write_text(self.__person_name(person))
+        self.doc.write_text('\\\\ \n')
+        self.doc.write_text('Годы жизни: 1945--2015 \\\\\n')
+        self.doc.write_text('Место рождения: Москва \\\\\n')
+        self.doc.write_text('Место смерти: Москва \\\\\n')
         self.doc.end_paragraph()
         #!!!
-
-        # List of (person, rank, ahnentafel, person_key) tuples for persons to
-        # process recursively after this one.
-#        more_sheets = []
-
-        # Numbering of spouses (integer, but printed in roman numbers).
-#        spouse_index = 0
-
-        # Numbering of children (integer, but printed as lowercase letters).
-#        child_index = 0
-
-        # Source references to print as footnotes.
-#        self.__citation_index = 0
-#        self.__citations = []
-
-        # Notes to print as footnotes.
-#        self.__note_index = 0
-#        self.__notes = []
-
-        # --- Now let the party begin! ---
-
-#        head_name = str(_Name_get_styled(person.get_primary_name(),
-#                                         _Name_CALLNAME_DONTUSE))
-#        mark2 = docgen.IndexMark(head_name, docgen.INDEX_TYPE_TOC, 2)
-
-#        self.doc.start_paragraph('FSR-Key')
-#        self.doc.write_text(person_key, mark2)
-#        self.doc.end_paragraph()
-
-#        self.doc.start_table(None, 'FSR-Table')
-
-        # Main person
-#        self.doc.start_row()
-#        self.doc.start_cell('FSR-HeadCell', 3)
-#        self.__dump_person(person, False, None)
-#        self.doc.end_cell()
-#        self.doc.end_row()
-
-        # Spouses
-#        for family_handle in person.get_family_handle_list():
-#            family = self.database.get_family_from_handle(family_handle)
-
-#            spouse_index += 1
-
-#            spouse_handle = utils.find_spouse(person, family)
-#            if spouse_handle:
-#                spouse = self.database.get_person_from_handle(spouse_handle)
-#            else:
-#                spouse = None
-
-            # Determine relationship between the center person and the spouse.
-            # If the spouse has a closer blood relationship than the current
-            # person, we refer to the Family Book of the spouse instead of
-            # printing the child list, because all children are more closely
-            # related to the center person via the spouse than via the current
-            # person. The same happens if the relationship is on the same
-            # level, but the relationship via the spouse goes via a common
-            # ancestor with a lower Ahnentafel numbering (i.e. a relationship
-            # stronger father-sided). In these cases, refer_spouse will be set
-            # to True.
-#            (spouse_rank, spouse_at, spouse_key) = \
-#                    self.__calc_person_key(spouse)
-#            if self.recurse != FamilyBookOptions.RECURSE_ALL:
-#                refer_spouse = (spouse_rank != -1 and \
-#                        (spouse_rank < rank or
-#                            (spouse_rank == rank and spouse_at < ahnentafel)))
-#            else:
-#                refer_spouse = False
-
-#            self.doc.start_row()
-
-#            self.doc.start_cell('FSR-NumberCell', 1)
-#            self.doc.start_paragraph('FSR-Number')
-#            self.doc.write_text(utils.roman(spouse_index))
-#            self.doc.end_paragraph()
-#            self.doc.end_cell()
-
-#            self.doc.start_cell('FSR-DataCell', 2)
-#            self.__dump_family(family, spouse)
-#            if refer_spouse:
-#                self.doc.start_paragraph('FSR-Normal')
-#                self.doc.write_text(_("\u2192 %s") % spouse_key)
-#                self.doc.end_paragraph()
-#            self.doc.end_cell()
-
-#            self.doc.end_row()
-
-#            if refer_spouse:
-#                # Spouse with closer relationship than current person? Don't
-#                # print children on this Family Book (but count them for the
-#                # numbering).
-#                child_index += len(family.get_child_ref_list())
-#                continue
-
-            # Children
-#            for child_ref in family.get_child_ref_list():
-#                child = self.database.get_person_from_handle(child_ref.ref)
-#                child_letter = string.ascii_lowercase[child_index]
-
-#                self.doc.start_row()
-
-#                self.doc.start_cell('FSR-EmptyCell', 1)
-#                self.doc.end_cell()
-
-#                self.doc.start_cell('FSR-NumberCell', 1)
-#                self.doc.start_paragraph('FSR-Number')
-#                self.doc.write_text(child_letter)
-#                self.doc.end_paragraph()
-#                self.doc.end_cell()
-
-#                self.doc.start_cell('FSR-DataCell', 1)
-
-#                has_spouses = (child.get_family_handle_list() != [])
-
-#                self.__dump_person(child, has_spouses, child_ref)
-
-#                if has_spouses:
-                    # We have to recalculate the key for this person, it could
-                    # be closer related if it is a direct ancestor of the
-                    # central person or one of its spouses.
-#                    (child_rank, child_at, child_key) = \
-#                            self.__calc_person_key(child)
-
-#                    self.doc.start_paragraph('FSR-Normal')
-#                    self.doc.write_text(_("\u2192 %s") % child_key)
-#                    self.doc.end_paragraph()
-
-                    # We recursively print this child *only* if its
-                    # relationship with the central person is closest via the
-                    # current person. This way, we avoid that a person is
-                    # printed recursively from more than one of its ancestors.
-#                    if child_key == person_key + child_letter or \
-#                            self.recurse == FamilyBookOptions.RECURSE_ALL:
-#                        more_sheets.append(
-#                                (child, child_rank, child_at, child_key))
-
-#                self.doc.end_cell()
-
-#                self.doc.end_row()
-
-#                child_index += 1
-
-#        self.doc.start_row()
-#        self.doc.start_cell('FSR-FootCell', 3)
-#        self.doc.end_cell()
-#        self.doc.end_row()
-
-#        self.doc.end_table()
-
-#        self.__dump_sources()
-#        self.__dump_notes()
-
-        # Now print the sheets for the children.
-#        if self.recurse != FamilyBookOptions.RECURSE_NONE:
-#            for (child, child_rank, child_at, child_key) in more_sheets:
-#                self.doc.page_break()
-#                self.__process_person(child, child_rank, child_at, child_key)
-
 
     def __dump_family(self, family, spouse):
         """
