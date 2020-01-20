@@ -94,7 +94,7 @@ class FamilyBook(Report):
 #        self.__process_person(person)
 
         person_list = list(self.obj_dict[Person].keys())
-#        person_list.sort(key = lambda x: self.obj_dict[Person][x][OBJDICT_INDEX])
+        person_list.sort(key = lambda x: self.obj_dict[Person][x][0])
         for person_handle in person_list:
             person = self.database.get_person_from_handle(person_handle)
             self.__process_person(person)
