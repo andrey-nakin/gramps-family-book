@@ -76,7 +76,7 @@ class FamilyBook(Report):
         self.doc.end_paragraph()
 
         self.doc.start_paragraph('FSR-Normal')
-        self.doc.write_text('\\documentclass[10pt, a5paper]{book}\n')
+        self.doc.write_text('\\documentclass[10pt, a5paper]{report}\n')
         self.doc.write_text('\\usepackage[utf8]{inputenc}\n')
         self.doc.write_text('\\usepackage[russian]{babel}\n')
         self.doc.write_text('\\usepackage{graphicx}\n')
@@ -141,6 +141,7 @@ class FamilyBook(Report):
         # Add person in the dictionaries of objects
         person = self.database.get_person_from_handle(person_handle)
         if (not person): return
+        if (not self.__is_person_valid(person)): return
         person_name = self.__person_name(person)
         self.obj_dict[Person][person_handle] = [person_name, person.gramps_id, len(self.obj_dict[Person])]
         # Person events
@@ -195,6 +196,17 @@ class FamilyBook(Report):
                     maindenName = ' (' + alt_name.get_surname() + ')'
 
         return displayer.display_name(person.get_primary_name()) + maindenName
+
+    def __is_person_valid(self, person):
+        """
+        Checks if person should be added to the book.
+
+        @param person: Person object.
+        """
+        if person.get_primary_name().get_surname() == '':
+            return False
+
+        return True
 
     def __process_person(self, person):
         #!!!
