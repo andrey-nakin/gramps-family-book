@@ -17,7 +17,7 @@ from collections import defaultdict
 #------------------------------------------------------------------------
 from gramps.gen.display.name import displayer
 from gramps.gen.display.place import displayer as place_displayer
-from gramps.gen.lib import Date, Event, EventType, FamilyRelType, Name, NameType, Person, Family, Place
+from gramps.gen.lib import Date, Event, EventType, FamilyRelType, Name, NameType, Person, Family, Place, EventRoleType
 from gramps.gen.lib import StyledText, StyledTextTag, StyledTextTagType
 from gramps.gen.plug import docgen
 from gramps.gen.plug.menu import BooleanOption, EnumeratedListOption, PersonOption
@@ -64,6 +64,10 @@ class FamilyBook(Report):
         self.user = user
         menu = options.menu
         self.person_id    = menu.get_option_by_name('pid').get_value()
+        self.document_class = 'memoir'
+        self.styleName = 'default'
+        self.language = 'russian'
+        self.citation_handles = set()
 
     def write_report(self):
         """
@@ -76,15 +80,22 @@ class FamilyBook(Report):
         self.doc.end_paragraph()
 
         self.doc.start_paragraph('FSR-Normal')
-        self.doc.write_text('\\documentclass[10pt, a5paper]{report}\n')
+        self.doc.write_text('\\documentclass[12pt, msmallroyalvopaper, openany]{')
+        self.doc.write_text(self.document_class)
+        self.doc.write_text('}\n')
         self.doc.write_text('\\usepackage[utf8]{inputenc}\n')
-        self.doc.write_text('\\usepackage[russian]{babel}\n')
+        self.doc.write_text('\\usepackage[')
+        self.doc.write_text(self.language)
+        self.doc.write_text(']{babel}\n')
         self.doc.write_text('\\usepackage{graphicx}\n')
         self.doc.write_text('\\usepackage{wrapfig}\n')
         self.doc.write_text('\\usepackage{multicol}\n')
-        self.doc.write_text('\\usepackage{tgadventor}\n')
+        self.doc.write_text('\\usepackage[superscript,biblabel]{cite}\n')
+        self.doc.write_text('\\setcounter{secnumdepth}{-1}\n')
+        self.doc.write_text('\\chapterstyle{bringhurst}\n')
         self.doc.write_text('\\begin{document}\n')
         self.doc.write_text('\\tableofcontents\n')
+        self.doc.write_text('\\tightlists\n')
         self.doc.write_text('\\part{Персоналии}\n')
         self.doc.end_paragraph()
 
@@ -101,6 +112,16 @@ class FamilyBook(Report):
             self.__process_person(person)
 
         self.doc.start_paragraph('FSR-Normal')
+        self.doc.write_text('\\begin{thebibliography}{99}\n')
+        for cit_handle in self.citation_handles:
+            cit = self.database.get_citation_from_handle(cit_handle)
+            self.doc.write_text('\\bibitem{')
+            self.doc.write_text(cit.get_gramps_id())
+            self.doc.write_text('} ')
+            self.doc.write_text(cit.get_page())
+            self.doc.write_text(' ')
+            self.doc.write_text('\n')
+        self.doc.write_text('\\end{thebibliography}\n')
         self.doc.write_text('\\end{document}\n')
         self.doc.end_paragraph()
 
@@ -206,11 +227,58 @@ class FamilyBook(Report):
         """
         if person.get_primary_name().get_surname() == '':
             return False
+        event_ref = person.get_birth_ref()
+        if event_ref is None:
+            return False
 
         return True
 
+    def __add_person_overview(self, title, value):
+        if value is not None:
+            self.doc.write_text('\\item ')
+            self.doc.write_text(title)
+            self.doc.write_text(':~')
+            self.doc.write_text(value)
+            self.doc.write_text('\n')
+
+    def __get_source_cites(self, event):
+        cites = ''
+        for cit_handle in event.get_citation_list():
+            if cit_handle:
+                cit = self.database.get_citation_from_handle(cit_handle)
+                if cites != '':
+                    cites = cites + ', '
+                cites = cites + cit.get_gramps_id()
+                self.citation_handles.add(cit_handle)
+        if cites != '':
+            cites = '~\cite{' + cites + '}'
+        return cites
+        
+    def __add_person_birth_death(self, person, event_ref, date_title):
+        if event_ref is None:
+            return None
+        if event_ref.get_role() != EventRoleType.PRIMARY:
+            return None
+        event = self.database.get_event_from_handle(event_ref.ref)
+        cites = self.__get_source_cites(event)
+            
+        dt = gramps.gen.datehandler.get_date(event)
+        if dt:
+            self.__add_person_overview(date_title, dt + cites)
+        
+    def __add_person_birth(self, person):
+        self.__add_person_birth_death(person, person.get_birth_ref(), _("Birth Date"))
+    
+    def __add_person_death(self, person):
+        self.__add_person_birth_death(person, person.get_death_ref(), _("Death Date"))
+            
+    def __make_parents(self, person):
+        s = ''
+        s = s + '\\item Отец: Свидригайлов Свидригайло Свидригайлович (с.~123)\n'
+        s = s + '\\item Мать: Свидригайлова Свидригайла Свидригайловна (Пупкина) (с.~123)\n'
+        return s
+        
     def __process_person(self, person):
-        #!!!
         self.doc.start_paragraph('FSR-Normal')
         self.doc.write_text('\\chapter{')
         self.doc.write_text(self.__person_name(person))
@@ -218,13 +286,14 @@ class FamilyBook(Report):
         self.doc.write_text('\\label{')
         self.doc.write_text(person.get_gramps_id())
         self.doc.write_text('}\n')
-        self.doc.write_text(self.__person_name(person))
-        self.doc.write_text('\\\\ \n')
-        self.doc.write_text('Годы жизни: 1945--2015 \\\\\n')
-        self.doc.write_text('Место рождения: Москва \\\\\n')
-        self.doc.write_text('Место смерти: Москва \\\\\n')
+        self.doc.write_text('\\begin{itemize}\n')
+        
+        self.__add_person_birth(person)
+        self.__add_person_death(person)
+            
+        self.doc.write_text(self.__make_parents(person))
+        self.doc.write_text('\\end{itemize}\n')
         self.doc.end_paragraph()
-        #!!!
 
 #------------------------------------------------------------------------
 #
