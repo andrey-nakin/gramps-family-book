@@ -233,6 +233,10 @@ class FamilyBook(Report):
 
         return True
 
+    def __lowercase_first_letter(self, str):
+        res = str[0].lower() + str[1:]
+        return res
+
     def __add_person_overview(self, title, value):
         if value is not None:
             self.doc.write_text('\\item ')
@@ -262,7 +266,7 @@ class FamilyBook(Report):
         event = self.database.get_event_from_handle(event_ref.ref)
         desc = ''
         if event.get_description():
-            desc = '~(' + event.get_description() + ')'
+            desc = '~(' + self.__lowercase_first_letter(event.get_description()) + ')'
         cites = self.__get_source_cites(event)
             
         dt = gramps.gen.datehandler.get_date(event)
