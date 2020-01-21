@@ -260,11 +260,15 @@ class FamilyBook(Report):
         if event_ref.get_role() != EventRoleType.PRIMARY:
             return None
         event = self.database.get_event_from_handle(event_ref.ref)
+        desc = ''
+        if event.get_description():
+            desc = '~(' + event.get_description() + ')'
         cites = self.__get_source_cites(event)
             
         dt = gramps.gen.datehandler.get_date(event)
         if dt:
-            self.__add_person_overview(date_title, dt + cites)
+            self.__add_person_overview(date_title, dt + desc + cites)
+            desc = ''
         
     def __add_person_birth(self, person):
         self.__add_person_birth_death(person, person.get_birth_ref(), _("Birth Date"))
