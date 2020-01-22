@@ -332,7 +332,14 @@ class FamilyBook(Report):
             
         self.doc.write_text(self.__make_parents(person))
         self.doc.write_text('\\end{itemize}\n')
+
+        s = '\\subsection*{\dag\dag\dag}\n\n'
+        s = s + 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.'
+        s = s + '\n\n'
+        
+        self.doc.write_text(s)
         self.doc.end_paragraph()
+        
 
 #------------------------------------------------------------------------
 #
