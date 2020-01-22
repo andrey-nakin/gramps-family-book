@@ -9,6 +9,7 @@
 #------------------------------------------------------------------------
 import string
 from collections import defaultdict
+from functools import partial
 
 #------------------------------------------------------------------------
 #
@@ -21,9 +22,10 @@ from gramps.gen.lib import Date, Event, EventType, FamilyRelType, Name, NameType
 from gramps.gen.lib import StyledText, StyledTextTag, StyledTextTagType
 from gramps.gen.plug import docgen
 from gramps.gen.plug.menu import BooleanOption, EnumeratedListOption, PersonOption
-from gramps.gen.plug.report import Report
-from gramps.gen.plug.report import utils
 from gramps.gen.plug.report import MenuReportOptions
+from gramps.gen.plug.report import Report
+from gramps.gen.plug.report import stdoptions
+from gramps.gen.plug.report import utils
 import gramps.gen.datehandler
 from gramps.gen.relationship import get_relationship_calculator
 from gramps.gen.const import GRAMPS_LOCALE as glocale
@@ -63,11 +65,16 @@ class FamilyBook(Report):
         Report.__init__(self, database, options, user)
         self.user = user
         menu = options.menu
+        self.citation_handles = set()
+
+        self.set_locale(options.menu.get_option_by_name('trans').get_value())
+        stdoptions.run_date_format_option(self, menu)
+        self.rlocale = self._locale
+        
         self.person_id    = menu.get_option_by_name('pid').get_value()
         self.document_class = 'memoir'
         self.styleName = 'default'
         self.language = 'russian'
-        self.citation_handles = set()
 
     def write_report(self):
         """
@@ -114,17 +121,41 @@ class FamilyBook(Report):
         self.doc.start_paragraph('FSR-Normal')
         self.doc.write_text('\\begin{thebibliography}{99}\n')
         for cit_handle in self.citation_handles:
-            cit = self.database.get_citation_from_handle(cit_handle)
-            self.doc.write_text('\\bibitem{')
-            self.doc.write_text(cit.get_gramps_id())
-            self.doc.write_text('} ')
-            self.doc.write_text(cit.get_page())
-            self.doc.write_text(' ')
-            self.doc.write_text('\n')
+            self.doc.write_text(self.__make_bib_item(cit_handle))
         self.doc.write_text('\\end{thebibliography}\n')
         self.doc.write_text('\\end{document}\n')
         self.doc.end_paragraph()
 
+    def __make_bib_item(self, cit_handle):
+        cit = self.database.get_citation_from_handle(cit_handle)
+        src_handle = cit.get_reference_handle()
+        src = self.database.get_source_from_handle(src_handle)
+        s = '\\bibitem{'
+        s = s + cit.get_gramps_id()
+        s = s + '} '
+        s = s + src.get_title()
+        if not s.endswith('.'):
+            s = s + '.'
+        if src.get_author() != '':
+            a = src.get_author()
+            if not a.endswith('.'):
+                a = a + '.'
+            s = s + ' {\\itshape '
+            s = s + a
+            s = s + '}'
+        if src.get_publication_info() != '':
+            pub = ' '
+            pub = pub + src.get_publication_info()
+            if not pub.endswith('.'):
+                pub = pub + '.'
+            s = s + pub
+        s = s + '~// '
+        s = s + cit.get_page()
+        if not s.endswith('.'):
+            s = s + '.'
+        s = s + '\n'
+        return s
+        
     def _build_obj_dict(self):
         _obj_class_list = (Person, Place)
 
@@ -269,9 +300,9 @@ class FamilyBook(Report):
             desc = '~(' + self.__lowercase_first_letter(event.get_description()) + ')'
         cites = self.__get_source_cites(event)
             
-        dt = gramps.gen.datehandler.get_date(event)
+        dt = self.rlocale.get_date(event.get_date_object())
         if dt:
-            self.__add_person_overview(date_title, dt + desc + cites)
+            self.__add_person_overview(date_title, '\\mbox{' + dt + '}' + desc + cites)
             desc = ''
         
     def __add_person_birth(self, person):
@@ -329,7 +360,10 @@ class FamilyBookOptions(MenuReportOptions):
         return displayer.display(person)
 
     def add_menu_options(self, menu):
+        self.__add_report_options(menu)
+        self.__add_report_display(menu)
 
+    def __add_report_options(self, menu):
         ##########################
         category_name = _("Report Options")
         ##########################
@@ -338,6 +372,53 @@ class FamilyBookOptions(MenuReportOptions):
         self.__pid.set_help(_("The person who is used to deterine the relatives' titles"))
         menu.add_option(category_name, "pid", self.__pid)
 
+    def __add_report_display(self, menu):
+        """
+        How to display names, datyes, ...
+        """
+        category_name = _("Display")
+        addopt = partial(menu.add_option, category_name)
+
+        stdoptions.add_name_format_option(menu, category_name)
+
+        locale_opt = stdoptions.add_localization_option(menu, category_name)
+        stdoptions.add_date_format_option(menu, category_name, locale_opt)
+
+#        stdoptions.add_gramps_id_option(menu, category_name)
+
+#        birthorder = BooleanOption(
+#            _('Sort all children in birth order'), False)
+#        birthorder.set_help(
+#            _('Whether to display children in birth order or in entry order?'))
+#        addopt("birthorder", birthorder)
+
+#        coordinates = BooleanOption(
+#            _('Do we display coordinates in the places list?'), False)
+#        coordinates.set_help(
+#            _('Whether to display latitude/longitude in the places list?'))
+#        addopt("coordinates", coordinates)
+
+#        reference_sort = BooleanOption(
+#            _('Sort places references either by date or by name'), False)
+#        reference_sort.set_help(
+#            _('Sort the places references by date or by name.'
+#              ' Not set means by date.'))
+#        addopt("reference_sort", reference_sort)
+
+#        self.__graphgens = NumberOption(_("Graph generations"), 4, 2, 10)
+#        self.__graphgens.set_help(_("The number of generations to include in "
+#                                    "the ancestor graph"))
+#        addopt("graphgens", self.__graphgens)
+#        self.__graph_changed()
+
+#        notes = BooleanOption(
+#            _('Include narrative notes just after name, gender'), True)
+#        notes.set_help(
+#            _('Include narrative notes just after name, gender and'
+#              ' age at death (default) or include them just before'
+#              ' attributes.'))
+#        addopt("notes", notes)
+        
     def make_default_style(self, default_style):
         """Make default output style for the Family Book Report."""
 
