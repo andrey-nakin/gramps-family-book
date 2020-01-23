@@ -98,6 +98,8 @@ class FamilyBook(Report):
         self.doc.write_text('\\usepackage{wrapfig}\n')
         self.doc.write_text('\\usepackage{multicol}\n')
         self.doc.write_text('\\usepackage[superscript,biblabel]{cite}\n')
+        self.doc.write_text('\\usepackage{enumitem}\n')
+        self.doc.write_text('\\usepackage{pgfornament}\n')
         self.doc.write_text('\\setcounter{secnumdepth}{-1}\n')
         self.doc.write_text('\\chapterstyle{bringhurst}\n')
         self.doc.write_text('\\begin{document}\n')
@@ -270,9 +272,9 @@ class FamilyBook(Report):
 
     def __add_person_overview(self, title, value):
         if value is not None:
-            self.doc.write_text('\\item ')
+            self.doc.write_text('\\item[')
             self.doc.write_text(title)
-            self.doc.write_text(':~')
+            self.doc.write_text('] ')
             self.doc.write_text(value)
             self.doc.write_text('\n')
 
@@ -306,15 +308,15 @@ class FamilyBook(Report):
             desc = ''
         
     def __add_person_birth(self, person):
-        self.__add_person_birth_death(person, person.get_birth_ref(), _("Birth Date"))
+        self.__add_person_birth_death(person, person.get_birth_ref(), _("Born"))
     
     def __add_person_death(self, person):
-        self.__add_person_birth_death(person, person.get_death_ref(), _("Death Date"))
+        self.__add_person_birth_death(person, person.get_death_ref(), _("Died"))
             
     def __make_parents(self, person):
         s = ''
-        s = s + '\\item Отец: Свидригайлов Свидригайло Свидригайлович (с.~123)\n'
-        s = s + '\\item Мать: Свидригайлова Свидригайла Свидригайловна (Пупкина) (с.~123)\n'
+        s = s + '\\item[' + _("Father") + '] Свидригайлов Свидригайло Свидригайлович (с.~123)\n'
+        s = s + '\\item[' + _("Mother") + '] Свидригайлова Свидригайла Свидригайловна (Пупкина) (с.~123)\n'
         return s
         
     def __process_person(self, person):
@@ -325,15 +327,19 @@ class FamilyBook(Report):
         self.doc.write_text('\\label{')
         self.doc.write_text(person.get_gramps_id())
         self.doc.write_text('}\n')
-        self.doc.write_text('\\begin{itemize}\n')
+        self.doc.write_text('\\begin{description}[style=multiline,font=\\normalfont\\scshape]\n')
         
         self.__add_person_birth(person)
         self.__add_person_death(person)
             
         self.doc.write_text(self.__make_parents(person))
-        self.doc.write_text('\\end{itemize}\n')
+        self.doc.write_text('\\end{description}\n\n')
 
-        s = '\\subsection*{\dag\dag\dag}\n\n'
+        s = '\\begin{center}\n'
+        s = s + '\\noindent \\pgfornament[width=0.618\\textwidth]{88}\n'
+        s = s + '\\medskip\n'
+        s = s + '\\end{center}\n\n'
+        
         s = s + 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.'
         s = s + '\n\n'
         
