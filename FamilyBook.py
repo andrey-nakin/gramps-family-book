@@ -102,6 +102,7 @@ class FamilyBook(Report):
         self.doc.write_text('\\usepackage{pgfornament}\n')
         self.doc.write_text('\\setcounter{secnumdepth}{-1}\n')
         self.doc.write_text('\\chapterstyle{bringhurst}\n')
+        self.doc.write_text('\\newcommand*{\\sclabel}[1]{\\normalfont\\scshape #1}\n')
         self.doc.write_text('\\begin{document}\n')
         self.doc.write_text('\\tableofcontents\n')
         self.doc.write_text('\\tightlists\n')
@@ -122,6 +123,7 @@ class FamilyBook(Report):
 
         self.doc.start_paragraph('FSR-Normal')
         self.doc.write_text('\\begin{thebibliography}{99}\n')
+        self.doc.write_text('\\scriptsize\n')
         for cit_handle in self.citation_handles:
             self.doc.write_text(self.__make_bib_item(cit_handle))
         self.doc.write_text('\\end{thebibliography}\n')
@@ -308,15 +310,23 @@ class FamilyBook(Report):
             desc = ''
         
     def __add_person_birth(self, person):
-        self.__add_person_birth_death(person, person.get_birth_ref(), _("Born"))
+        if int(person.get_gender()) == Person.FEMALE:
+            title = "Родилась"
+        else:
+            title = "Родился"
+        self.__add_person_birth_death(person, person.get_birth_ref(), title)
     
     def __add_person_death(self, person):
-        self.__add_person_birth_death(person, person.get_death_ref(), _("Died"))
+        if int(person.get_gender()) == Person.FEMALE:
+            title = "Умерла"
+        else:
+            title = "Умер"
+        self.__add_person_birth_death(person, person.get_death_ref(), title)
             
     def __make_parents(self, person):
         s = ''
-        s = s + '\\item[' + _("Father") + '] Свидригайлов Свидригайло Свидригайлович (с.~123)\n'
-        s = s + '\\item[' + _("Mother") + '] Свидригайлова Свидригайла Свидригайловна (Пупкина) (с.~123)\n'
+        s = s + '\\item[' + _("Father") + '] Свидригайлов Свидригайло Свидригайлович, ' + _("p") + '.~123.\n'
+        s = s + '\\item[' + _("Mother") + '] Свидригайлова Свидригайла Свидригайловна (Пупкина), ' + _("p") + '.~123.\n'
         return s
         
     def __process_person(self, person):
@@ -327,13 +337,13 @@ class FamilyBook(Report):
         self.doc.write_text('\\label{')
         self.doc.write_text(person.get_gramps_id())
         self.doc.write_text('}\n')
-        self.doc.write_text('\\begin{description}[style=multiline,font=\\normalfont\\scshape]\n')
+        self.doc.write_text('\\begin{flexlabelled}{sclabel}{2em}{0.5em}{0.5em}{2em}{0pt}\n')
         
         self.__add_person_birth(person)
         self.__add_person_death(person)
             
         self.doc.write_text(self.__make_parents(person))
-        self.doc.write_text('\\end{description}\n\n')
+        self.doc.write_text('\\end{flexlabelled}\n\n')
 
         s = '\\begin{center}\n'
         s = s + '\\noindent \\pgfornament[width=0.618\\textwidth]{88}\n'
