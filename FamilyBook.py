@@ -18,7 +18,7 @@ from functools import partial
 #------------------------------------------------------------------------
 from gramps.gen.display.name import displayer
 from gramps.gen.display.place import displayer as place_displayer
-from gramps.gen.lib import Date, Event, EventType, FamilyRelType, Name, NameType, Person, Family, Place, EventRoleType
+from gramps.gen.lib import Date, Event, EventType, FamilyRelType, Name, NameType, Person, Family, Place, EventRoleType, NoteType
 from gramps.gen.lib import StyledText, StyledTextTag, StyledTextTagType
 from gramps.gen.plug import docgen
 from gramps.gen.plug.menu import BooleanOption, EnumeratedListOption, PersonOption
@@ -272,6 +272,10 @@ class FamilyBook(Report):
         res = str[0].lower() + str[1:]
         return res
 
+    def __prepare_tex_for_latex(self, str):
+        str = str.replace('&nbsp;', '~')
+        return str
+    
     def __add_person_overview(self, title, value):
         if value is not None:
             self.doc.write_text('\\item[')
@@ -311,16 +315,16 @@ class FamilyBook(Report):
         
     def __add_person_birth(self, person):
         if int(person.get_gender()) == Person.FEMALE:
-            title = "Родилась"
+            title = "Родилась" # TODO
         else:
-            title = "Родился"
+            title = "Родился" # TODO
         self.__add_person_birth_death(person, person.get_birth_ref(), title)
     
     def __add_person_death(self, person):
         if int(person.get_gender()) == Person.FEMALE:
-            title = "Умерла"
+            title = "Умерла" # TODO
         else:
-            title = "Умер"
+            title = "Умер" # TODO
         self.__add_person_birth_death(person, person.get_death_ref(), title)
             
     def __make_parents(self, person):
@@ -345,14 +349,17 @@ class FamilyBook(Report):
         self.doc.write_text(self.__make_parents(person))
         self.doc.write_text('\\end{flexlabelled}\n\n')
 
-        s = '\\begin{center}\n'
-        s = s + '\\noindent \\pgfornament[width=0.618\\textwidth]{88}\n'
-        s = s + '\\medskip\n'
-        s = s + '\\end{center}\n\n'
-        
-        s = s + 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.'
-        s = s + '\n\n'
-        
+        s = ''
+        for note_handle in person.get_note_list():
+            note = self.database.get_note_from_handle(note_handle)
+            if int(note.get_type()) == NoteType.PERSON:
+                s = s + '\\begin{center}\n'
+                s = s + '\\noindent \\pgfornament[width=0.618\\textwidth]{88}\n'
+                s = s + '\\medskip\n'
+                s = s + '\\end{center}\n\n'
+                s = s + self.__prepare_tex_for_latex(note.get())
+                s = s + '\n\n'
+            
         self.doc.write_text(s)
         self.doc.end_paragraph()
         
