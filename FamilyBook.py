@@ -272,6 +272,11 @@ class FamilyBook(Report):
         res = str[0].lower() + str[1:]
         return res
 
+    def __needs_trailing_dot(self, str):
+        if not str.endswith('.'):
+            str = str + '.'
+        return str
+        
     def __prepare_tex_for_latex(self, str):
         str = str.replace('&nbsp;', '~')
         return str
@@ -299,19 +304,29 @@ class FamilyBook(Report):
         
     def __add_person_birth_death(self, person, event_ref, date_title):
         if event_ref is None:
-            return None
+            return
         if event_ref.get_role() != EventRoleType.PRIMARY:
-            return None
+            return
         event = self.database.get_event_from_handle(event_ref.ref)
-        desc = ''
-        if event.get_description():
-            desc = '~(' + self.__lowercase_first_letter(event.get_description()) + ')'
-        cites = self.__get_source_cites(event)
+        if event is None:
+            return
+        str = ''
             
         dt = self.rlocale.get_date(event.get_date_object())
         if dt:
-            self.__add_person_overview(date_title, '\\mbox{' + dt + '}' + desc + cites)
-            desc = ''
+            str = '\\mbox{' + dt + '}'
+            
+        if event.get_place_handle():
+            if str != '':
+                str = str + ', '
+            str = str + place_displayer.display_event(self.database, event)
+
+        if str != '':
+            if event.get_description():
+                str = str + '~(' + self.__lowercase_first_letter(event.get_description()) + ')'
+            str = self.__needs_trailing_dot(str)
+            cites = self.__get_source_cites(event)
+            self.__add_person_overview(date_title, str + cites)
         
     def __add_person_birth(self, person):
         if int(person.get_gender()) == Person.FEMALE:
@@ -354,7 +369,7 @@ class FamilyBook(Report):
             note = self.database.get_note_from_handle(note_handle)
             if int(note.get_type()) == NoteType.PERSON:
                 s = s + '\\begin{center}\n'
-                s = s + '\\noindent \\pgfornament[width=0.618\\textwidth]{88}\n'
+                s = s + '\\noindent \\pgfornament[width=0.309\\textwidth]{88}\n'
                 s = s + '\\medskip\n'
                 s = s + '\\end{center}\n\n'
                 s = s + self.__prepare_tex_for_latex(note.get())
