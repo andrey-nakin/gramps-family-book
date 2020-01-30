@@ -98,14 +98,19 @@ class FamilyBook(Report):
         self.doc.write_text('\\usepackage{wrapfig}\n')
         self.doc.write_text('\\usepackage{multicol}\n')
         self.doc.write_text('\\usepackage[superscript,biblabel]{cite}\n')
+        self.doc.write_text('\\setcounter{secnumdepth}{-1}\n')
+        # styling
+        self.doc.write_text('\\tightlists\n')
         self.doc.write_text('\\usepackage{enumitem}\n')
         self.doc.write_text('\\usepackage{pgfornament}\n')
-        self.doc.write_text('\\setcounter{secnumdepth}{-1}\n')
         self.doc.write_text('\\chapterstyle{bringhurst}\n')
         self.doc.write_text('\\newcommand*{\\sclabel}[1]{\\normalfont\\scshape #1}\n')
+        self.doc.write_text('\\newcommand{\\fbNoteSeparator}{\\begin{center}\\noindent\\pgfornament[width=0.309\\textwidth]{88}\\medskip\end{center}}\n')
+        self.doc.write_text('\\newcommand{\\fbBeginPersonDescription}{\\begin{flexlabelled}{sclabel}{2em}{0.5em}{0.5em}{2em}{0pt}}\n')
+        self.doc.write_text('\\newcommand{\\fbEndPersonDescription}{\\end{flexlabelled}}\n')
+        # end of styling
         self.doc.write_text('\\begin{document}\n')
         self.doc.write_text('\\tableofcontents\n')
-        self.doc.write_text('\\tightlists\n')
         self.doc.write_text('\\part{Персоналии}\n')
         self.doc.end_paragraph()
 
@@ -323,7 +328,7 @@ class FamilyBook(Report):
 
         if str != '':
             if event.get_description():
-                str = str + '~(' + self.__lowercase_first_letter(event.get_description()) + ')'
+                str = str + ' (' + self.__lowercase_first_letter(event.get_description()) + ')'
             str = self.__needs_trailing_dot(str)
             cites = self.__get_source_cites(event)
             self.__add_person_overview(date_title, str + cites)
@@ -356,22 +361,19 @@ class FamilyBook(Report):
         self.doc.write_text('\\label{')
         self.doc.write_text(person.get_gramps_id())
         self.doc.write_text('}\n')
-        self.doc.write_text('\\begin{flexlabelled}{sclabel}{2em}{0.5em}{0.5em}{2em}{0pt}\n')
+        self.doc.write_text('\\fbBeginPersonDescription\n')
         
         self.__add_person_birth(person)
         self.__add_person_death(person)
             
         self.doc.write_text(self.__make_parents(person))
-        self.doc.write_text('\\end{flexlabelled}\n\n')
+        self.doc.write_text('\\fbEndPersonDescription\n\n')
 
         s = ''
         for note_handle in person.get_note_list():
             note = self.database.get_note_from_handle(note_handle)
             if int(note.get_type()) == NoteType.PERSON:
-                s = s + '\\begin{center}\n'
-                s = s + '\\noindent \\pgfornament[width=0.309\\textwidth]{88}\n'
-                s = s + '\\medskip\n'
-                s = s + '\\end{center}\n\n'
+                s = s + '\\fbNoteSeparator\n\n'
                 s = s + self.__prepare_tex_for_latex(note.get())
                 s = s + '\n\n'
             
