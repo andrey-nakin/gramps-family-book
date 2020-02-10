@@ -87,7 +87,7 @@ class FamilyBook(Report):
         self.doc.end_paragraph()
 
         self.doc.start_paragraph('FSR-Normal')
-        self.doc.write_text('\\documentclass[12pt, msmallroyalvopaper, openany]{')
+        self.doc.write_text('\\documentclass[11pt, msmallroyalvopaper, openany]{')
         self.doc.write_text(self.document_class)
         self.doc.write_text('}\n')
         self.doc.write_text('\\usepackage[utf8]{inputenc}\n')
@@ -99,16 +99,20 @@ class FamilyBook(Report):
         self.doc.write_text('\\usepackage{multicol}\n')
         self.doc.write_text('\\usepackage[superscript,biblabel]{cite}\n')
         self.doc.write_text('\\setcounter{secnumdepth}{-1}\n')
-        # styling
+        
+        self.doc.write_text('\n% styling\n')
         self.doc.write_text('\\tightlists\n')
         self.doc.write_text('\\usepackage{enumitem}\n')
         self.doc.write_text('\\usepackage{pgfornament}\n')
         self.doc.write_text('\\chapterstyle{bringhurst}\n')
+        self.doc.write_text('\\definecolor{sepia}{rgb}{0.44, 0.26, 0.08}\n')
         self.doc.write_text('\\newcommand*{\\sclabel}[1]{\\normalfont\\scshape #1}\n')
-        self.doc.write_text('\\newcommand{\\fbNoteSeparator}{\\begin{center}\\noindent\\pgfornament[width=0.309\\textwidth]{88}\\medskip\end{center}}\n')
-        self.doc.write_text('\\newcommand{\\fbBeginPersonDescription}{\\begin{flexlabelled}{sclabel}{2em}{0.5em}{0.5em}{2em}{0pt}}\n')
+        self.doc.write_text('\\newcommand{\\fbNoteSeparator}{\\begin{center}\\noindent\\pgfornament[width=2em, color=sepia]{2}\\medskip\end{center}}\n')
+        self.doc.write_text('\\newcommand{\\fbBeginPersonDescription}{\\begin{flexlabelled}{sclabel}{2em}{1.0em}{1.0em}{2em}{0pt}}\n')
         self.doc.write_text('\\newcommand{\\fbEndPersonDescription}{\\end{flexlabelled}}\n')
-        # end of styling
+        self.doc.write_text('\\newcommand{\\fbPersonDescriptionItem}[2]{\\item[#1] #2}\n')
+        self.doc.write_text('% end of styling\n\n')
+        
         self.doc.write_text('\\begin{document}\n')
         self.doc.write_text('\\tableofcontents\n')
         self.doc.write_text('\\part{Персоналии}\n')
@@ -126,6 +130,10 @@ class FamilyBook(Report):
             person = self.database.get_person_from_handle(person_handle)
             self.__process_person(person)
 
+        self.doc.start_paragraph('FSR-Normal')
+        self.doc.write_text('\\part{Места}\n')
+        self.doc.end_paragraph()
+            
         self.doc.start_paragraph('FSR-Normal')
         self.doc.write_text('\\begin{thebibliography}{99}\n')
         self.doc.write_text('\\scriptsize\n')
@@ -288,11 +296,11 @@ class FamilyBook(Report):
     
     def __add_person_overview(self, title, value):
         if value is not None:
-            self.doc.write_text('\\item[')
+            self.doc.write_text('\\fbPersonDescriptionItem{')
             self.doc.write_text(title)
-            self.doc.write_text('] ')
+            self.doc.write_text('}{')
             self.doc.write_text(value)
-            self.doc.write_text('\n')
+            self.doc.write_text('}\n')
 
     def __get_source_cites(self, event):
         cites = ''
@@ -307,19 +315,15 @@ class FamilyBook(Report):
             cites = '~\cite{' + cites + '}'
         return cites
         
-    def __add_person_birth_death(self, person, event_ref, date_title):
-        if event_ref is None:
-            return
-        if event_ref.get_role() != EventRoleType.PRIMARY:
-            return
-        event = self.database.get_event_from_handle(event_ref.ref)
+    def __add_person_event(self, person, event, title, disp_date = False):
         if event is None:
             return
         str = ''
-            
-        dt = self.rlocale.get_date(event.get_date_object())
-        if dt:
-            str = '\\mbox{' + dt + '}'
+
+        if disp_date:
+            dt = self.rlocale.get_date(event.get_date_object())
+            if dt:
+                str = '\\mbox{' + dt + '}'
             
         if event.get_place_handle():
             if str != '':
@@ -331,27 +335,36 @@ class FamilyBook(Report):
                 str = str + ' (' + self.__lowercase_first_letter(event.get_description()) + ')'
             str = self.__needs_trailing_dot(str)
             cites = self.__get_source_cites(event)
-            self.__add_person_overview(date_title, str + cites)
+            self.__add_person_overview(title, str + cites)
+            
+    def __add_person_event_ref(self, person, event_ref, title, disp_date = False):
+        if event_ref is None:
+            return
+        if event_ref.get_role() != EventRoleType.PRIMARY:
+            return
+        event = self.database.get_event_from_handle(event_ref.ref)
+        self.__add_person_event(person, event, title, disp_date)
         
     def __add_person_birth(self, person):
         if int(person.get_gender()) == Person.FEMALE:
             title = "Родилась" # TODO
         else:
             title = "Родился" # TODO
-        self.__add_person_birth_death(person, person.get_birth_ref(), title)
+        self.__add_person_event_ref(person, person.get_birth_ref(), title, True)
     
     def __add_person_death(self, person):
         if int(person.get_gender()) == Person.FEMALE:
             title = "Умерла" # TODO
         else:
             title = "Умер" # TODO
-        self.__add_person_birth_death(person, person.get_death_ref(), title)
-            
-    def __make_parents(self, person):
-        s = ''
-        s = s + '\\item[' + _("Father") + '] Свидригайлов Свидригайло Свидригайлович, ' + _("p") + '.~123.\n'
-        s = s + '\\item[' + _("Mother") + '] Свидригайлова Свидригайла Свидригайловна (Пупкина), ' + _("p") + '.~123.\n'
-        return s
+        self.__add_person_event_ref(person, person.get_death_ref(), title, True)
+
+    def __add_person_parent(self, parent, title):
+        s = self.__person_name(parent)
+        if self.__is_person_valid(parent):
+            s = s + ', ' + 'с.' + '~\\pageref{' + parent.get_gramps_id() + '}' # TODO
+        s = s + '.'
+        self.__add_person_overview(title, s)
         
     def __process_person(self, person):
         self.doc.start_paragraph('FSR-Normal')
@@ -361,14 +374,50 @@ class FamilyBook(Report):
         self.doc.write_text('\\label{')
         self.doc.write_text(person.get_gramps_id())
         self.doc.write_text('}\n')
+        self.doc.write_text('\\small\n')
         self.doc.write_text('\\fbBeginPersonDescription\n')
         
         self.__add_person_birth(person)
         self.__add_person_death(person)
-            
-        self.doc.write_text(self.__make_parents(person))
-        self.doc.write_text('\\fbEndPersonDescription\n\n')
+        for event_ref in person.get_primary_event_ref_list():
+            event = self.database.get_event_from_handle(event_ref.ref)
+            if event and int(event.get_type()) == EventType.BURIAL:
+                if int(person.get_gender()) == Person.FEMALE:
+                    title = "Похоронена" # TODO
+                else:
+                    title = "Похоронен" # TODO
+                self.__add_person_event(person, event, title, False)
 
+        parents = set()
+        for fam_handle in person.get_parent_family_handle_list():
+            family = self.database.get_family_from_handle(fam_handle)
+            father_handle = family.get_father_handle()
+            if father_handle and not(father_handle in parents):
+                father = self.database.get_person_from_handle(father_handle)
+                self.__add_person_parent(father, _("Father"))
+                parents.add(father_handle)
+            mother_handle = family.get_mother_handle()
+            if mother_handle and not(mother_handle in parents):
+                mother = self.database.get_person_from_handle(mother_handle)
+                self.__add_person_parent(mother, _("Mother"))
+                parents.add(mother_handle)
+
+        for fam_handle in person.get_family_handle_list():
+            family = self.database.get_family_from_handle(fam_handle)
+            if int(person.get_gender()) == Person.FEMALE:
+                father_handle = family.get_father_handle()
+                if father_handle:
+                    husband = self.database.get_person_from_handle(father_handle)
+                    self.__add_person_parent(husband, "Супруг") # TODO
+            else:
+                mother_handle = family.get_mother_handle()
+                if mother_handle:
+                    wife = self.database.get_person_from_handle(mother_handle)
+                    self.__add_person_parent(wife, "Супруга") # TODO
+            
+        self.doc.write_text('\\fbEndPersonDescription\n')
+        self.doc.write_text('\\normalsize\n')
+        
         s = ''
         for note_handle in person.get_note_list():
             note = self.database.get_note_from_handle(note_handle)
