@@ -102,14 +102,17 @@ class FamilyBook(Report):
         
         self.doc.write_text('\n% styling\n')
         self.doc.write_text('\\tightlists\n')
+        self.doc.write_text('\\usepackage{calc}\n')
         self.doc.write_text('\\usepackage{enumitem}\n')
         self.doc.write_text('\\usepackage{pgfornament}\n')
         self.doc.write_text('\\chapterstyle{bringhurst}\n')
-        self.doc.write_text('\\definecolor{sepia}{rgb}{0.44, 0.26, 0.08}\n')
+        self.doc.write_text('\\definecolor{steelgrey}{rgb}{0.62, 0.62, 0.62}\n')
         self.doc.write_text('\\newcommand*{\\sclabel}[1]{\\normalfont\\scshape #1}\n')
-        self.doc.write_text('\\newcommand{\\fbNoteSeparator}{\\begin{center}\\noindent\\pgfornament[width=2em, color=sepia]{2}\\medskip\end{center}}\n')
-        self.doc.write_text('\\newcommand{\\fbBeginPersonDescription}{\\begin{flexlabelled}{sclabel}{2em}{1.0em}{1.0em}{2em}{0pt}}\n')
-        self.doc.write_text('\\newcommand{\\fbEndPersonDescription}{\\end{flexlabelled}}\n')
+        self.doc.write_text('\\newcommand{\\fbNoteSeparator}{\\begin{center}\\noindent\\pgfornament[width=2em,color=steelgrey]{94}\\medskip\end{center}}\n')
+        self.doc.write_text('\\newcommand{\\fbBeginPersonDescription}{\\begin{description}[before=\\renewcommand{\\makelabel}{\\sclabel},leftmargin=!,labelwidth=\\widthof{\\sclabel{Похоронена}}]}\n')
+        self.doc.write_text('\\newcommand{\\fbEndPersonDescription}{\\end{description}}\n')
+#        self.doc.write_text('\\newcommand{\\fbBeginPersonDescription}{\\begin{flexlabelled}{sclabel}{2em}{1.0em}{1.0em}{2em}{0pt}}\n')
+#        self.doc.write_text('\\newcommand{\\fbEndPersonDescription}{\\end{flexlabelled}}\n')
         self.doc.write_text('\\newcommand{\\fbPersonDescriptionItem}[2]{\\item[#1] #2}\n')
         self.doc.write_text('% end of styling\n\n')
         
@@ -359,12 +362,15 @@ class FamilyBook(Report):
             title = "Умер" # TODO
         self.__add_person_event_ref(person, person.get_death_ref(), title, True)
 
-    def __add_person_parent(self, parent, title):
+    def __make_person_parent(self, parent):
         s = self.__person_name(parent)
         if self.__is_person_valid(parent):
             s = s + ', ' + 'с.' + '~\\pageref{' + parent.get_gramps_id() + '}' # TODO
         s = s + '.'
-        self.__add_person_overview(title, s)
+        return s
+        
+    def __add_person_parent(self, parent, title):
+        self.__add_person_overview(title, self.__make_person_parent(parent))
         
     def __process_person(self, person):
         self.doc.start_paragraph('FSR-Normal')
@@ -402,19 +408,31 @@ class FamilyBook(Report):
                 self.__add_person_parent(mother, _("Mother"))
                 parents.add(mother_handle)
 
+        s = ''
         for fam_handle in person.get_family_handle_list():
             family = self.database.get_family_from_handle(fam_handle)
+            s2 = ''
             if int(person.get_gender()) == Person.FEMALE:
                 father_handle = family.get_father_handle()
                 if father_handle:
                     husband = self.database.get_person_from_handle(father_handle)
-                    self.__add_person_parent(husband, "Супруг") # TODO
+                    s2 = self.__make_person_parent(husband)
             else:
                 mother_handle = family.get_mother_handle()
                 if mother_handle:
                     wife = self.database.get_person_from_handle(mother_handle)
-                    self.__add_person_parent(wife, "Супруга") # TODO
-            
+                    s2 = self.__make_person_parent(wife)
+            if s2 != '':
+                if s != '':
+                    s = s + ' \\\\\n'
+                s = s + s2
+        if s != '':
+            if int(person.get_gender()) == Person.FEMALE:
+                title = "Супруг" # TODO
+            else:
+                title = "Супруга" # TODO
+            self.__add_person_overview(title, s)
+                    
         self.doc.write_text('\\fbEndPersonDescription\n')
         self.doc.write_text('\\normalsize\n')
         
