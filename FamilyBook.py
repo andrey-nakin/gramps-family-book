@@ -366,8 +366,7 @@ class FamilyBook(Report):
         s = self.__person_name(parent)
         if self.__is_person_valid(parent):
             s = s + ', ' + 'с.' + '~\\pageref{' + parent.get_gramps_id() + '}' # TODO
-        s = s + '.'
-        return s
+        return self.__needs_trailing_dot(s)
         
     def __add_person_parent(self, parent, title):
         self.__add_person_overview(title, self.__make_person_parent(parent))
