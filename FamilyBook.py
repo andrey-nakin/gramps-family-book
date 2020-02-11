@@ -94,6 +94,7 @@ class FamilyBook(Report):
         self.doc.write_text('\\usepackage[')
         self.doc.write_text(self.language)
         self.doc.write_text(']{babel}\n')
+        self.doc.write_text('\\usepackage{caption}\n')
         self.doc.write_text('\\usepackage{graphicx}\n')
         self.doc.write_text('\\usepackage{wrapfig}\n')
         self.doc.write_text('\\usepackage{multicol}\n')
